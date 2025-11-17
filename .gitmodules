@@ -1,3 +1,0 @@
-[submodule "third_party/ORB_SLAM3"]
-	path = third_party/ORB_SLAM3
-	url = https://github.com/robotvisionmu/ORB_SLAM3.git
