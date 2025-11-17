@@ -7,8 +7,6 @@
 #include <iostream>
 #include <map>
 
-using ORB_SLAM3::KeyFrameExport;
-// using ORB_SLAM3::KeyFrameExportVector;
 namespace py = pybind11;
 class ORBSLAM3Python
 {
