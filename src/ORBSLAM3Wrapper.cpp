@@ -231,6 +231,5 @@ PYBIND11_MODULE(orbslam3, m)
         .def("get_active_map_id", &ORBSLAM3Python::GetActiveMapID)
         .def("get_all_keyframe_times", &ORBSLAM3Python::GetAllKeyFrameTimes, py::return_value_policy::copy)
         .def("get_all_keyframe_map_ids", &ORBSLAM3Python::GetAllKeyFrameMapIDs, py::return_value_policy::copy)
-        .def("get_all_keyframe_poses", &ORBSLAM3Python::GetAllKeyFramePosesNP)
-        .def("process_image_rgbd_imu", &ORBSLAM3Python::processRGBD_IMU, py::arg("image"), py::arg("depth"), py::arg("time_stamp"), py::arg("vImuMeas"));
+        .def("get_all_keyframe_poses", &ORBSLAM3Python::GetAllKeyFramePosesNP);
 }
