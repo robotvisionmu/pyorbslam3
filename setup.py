@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import shutil
 import numpy as np
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
@@ -23,20 +24,23 @@ class CMakeBuild(build_ext):
             os.makedirs(self.build_temp)
 
         cmake_args = [
-            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
+            f"-DPYTHON_MODULE_OUTPUT_DIR={extdir}",
+            f"-DCMAKE_INSTALL_PREFIX={os.environ.get('CONDA_PREFIX')}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE=Release",
-            f"-DCMAKE_CXX_FLAGS='-I {np.get_include()}'"
+            f"-DCMAKE_CXX_FLAGS='-w -I {np.get_include()}'"
         ]
 
         subprocess.check_call(
             ["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp)
         subprocess.check_call(
-            ["cmake", "--build", ".", "-j"], cwd=self.build_temp)
+            ["cmake", "--build", ".", "-j12"], cwd=self.build_temp)
+        subprocess.check_call(["cmake", "--install", "."], cwd=self.build_temp)
 
 
 setup(
     name="orbslam3",
+    version="1.0.0",
     install_requires=["numpy"],
     ext_modules=[CMakeExtension("orbslam3")],
     cmdclass={"build_ext": CMakeBuild},
