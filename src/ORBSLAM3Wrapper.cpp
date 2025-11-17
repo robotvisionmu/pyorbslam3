@@ -3,10 +3,10 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <ORB_SLAM3/include/KeyFrame.h>
-#include <ORB_SLAM3/include/Converter.h>
-#include <ORB_SLAM3/include/Tracking.h>
-#include <ORB_SLAM3/include/MapPoint.h>
+#include <KeyFrame.h>
+#include <Converter.h>
+#include <Tracking.h>
+#include <MapPoint.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -17,12 +17,12 @@
 
 namespace py = pybind11;
 
-ORBSLAM3Python::ORBSLAM3Python(std::string vocabFile, std::string settingsFile, ORB_SLAM3::System::eSensor sensorMode)
-    : vocabluaryFile(vocabFile),
-      settingsFile(settingsFile),
-      sensorMode(sensorMode),
-      system(nullptr),
-      bUseViewer(false)
+ORBSLAM3Python::ORBSLAM3Python(std::string vocabFile, std::string settingsFile, ORB_SLAM3::System::eSensor sensorMode): 
+    vocabluaryFile(vocabFile),
+    settingsFile(settingsFile),
+    sensorMode(sensorMode),
+    system(nullptr),
+    bUseViewer(false)
 {
 }
 
@@ -34,19 +34,6 @@ bool ORBSLAM3Python::initialize()
 {
     system = std::make_shared<ORB_SLAM3::System>(vocabluaryFile, settingsFile, sensorMode, bUseViewer);
     return true;
-}
-
-bool ORBSLAM3Python::isRunning()
-{
-    return system != nullptr;
-}
-
-void ORBSLAM3Python::reset()
-{
-    if (system)
-    {
-        system->Reset();
-    }
 }
 
 bool ORBSLAM3Python::processMono(cv::Mat image, double timestamp)
@@ -102,12 +89,33 @@ bool ORBSLAM3Python::processRGBD(cv::Mat image, cv::Mat depthImage, double times
     }
 }
 
+void ORBSLAM3Python::reset()
+{
+    if (system)
+    {
+        system->Reset();
+    }
+}
+
 void ORBSLAM3Python::shutdown()
 {
     if (system)
     {
         system->Shutdown();
     }
+}
+
+bool ORBSLAM3Python::isShutDown()
+{
+    if(system)
+    {
+        return system->isShutDown();
+    }
+}
+
+bool ORBSLAM3Python::isRunning()
+{
+    return system != nullptr;
 }
 
 void ORBSLAM3Python::setUseViewer(bool useViewer)
@@ -118,6 +126,68 @@ void ORBSLAM3Python::setUseViewer(bool useViewer)
 std::vector<Eigen::Matrix4f> ORBSLAM3Python::getTrajectory() const
 {
     return system->GetCameraTrajectory();
+}
+
+bool ORBSLAM3Python::ViewerShouldQuit()
+{
+    return system->ViewerShouldQuit();
+}
+
+int ORBSLAM3Python::GetNumMapsInAtlas()
+{
+    return system->GetNumMapsInAtlas();
+}
+
+int ORBSLAM3Python::GetActiveMapID()
+{
+    return system->GetActiveMapID();
+}
+
+std::vector<double> ORBSLAM3Python::GetAllKeyFrameTimes()
+{
+    std::vector<double> vTimes = system->GetAllKeyFrameTimes();
+   return vTimes;
+}
+
+std::vector<std::array<float,16>> ORBSLAM3Python::GetAllKeyFramePoses()
+{
+    return system->GetAllKeyFramePoses();
+}
+
+py::array_t<float> ORBSLAM3Python::GetAllKeyFramePosesNP()
+{
+    auto poses = GetAllKeyFramePoses();
+    py::ssize_t N = poses.size();
+    py::array_t<float> arr({N,(py::ssize_t)4,(py::ssize_t)4});
+    auto buf = arr.mutable_unchecked<3>();
+    for(py::ssize_t i=0;i<N;++i)
+        std::memcpy(buf.mutable_data(i,0,0), poses[i].data(), 16*sizeof(float));
+    return arr;
+}
+
+std::vector<int> ORBSLAM3Python::GetAllKeyFrameMapIDs()
+{
+    std::vector<int> vMapIDs = system->GetAllKeyFrameMapIDs();
+    return vMapIDs;
+}
+
+py::tuple ORBSLAM3Python::GetAllKeyFrameData()
+{
+    std::vector<double> times;
+    std::vector<std::array<float,16>> poses_aos;
+    std::vector<int> mapIDs;
+    system->GetAllKeyFrameData(times, poses_aos, mapIDs);
+
+    py::ssize_t N = static_cast<py::ssize_t>(poses_aos.size());
+    py::array_t<float> poses_np({N, (py::ssize_t)4, (py::ssize_t)4});
+    auto buf = poses_np.mutable_unchecked<3>();
+    for (py::ssize_t i = 0; i < N; ++i)
+    {
+        // Copy 16 floats row-major into the numpy slice
+        std::memcpy(buf.mutable_data(i, 0, 0), poses_aos[i].data(), 16*sizeof(float));
+    }
+
+    return py::make_tuple(times, poses_np, mapIDs);
 }
 
 PYBIND11_MODULE(orbslam3, m)
@@ -146,9 +216,21 @@ PYBIND11_MODULE(orbslam3, m)
         .def("process_image_mono", &ORBSLAM3Python::processMono, py::arg("image"), py::arg("time_stamp"))
         .def("process_image_stereo", &ORBSLAM3Python::processStereo, py::arg("left_image"), py::arg("right_image"), py::arg("time_stamp"))
         .def("process_image_rgbd", &ORBSLAM3Python::processRGBD, py::arg("image"), py::arg("depth"), py::arg("time_stamp"))
-        .def("shutdown", &ORBSLAM3Python::shutdown)
-        .def("is_running", &ORBSLAM3Python::isRunning)
         .def("reset", &ORBSLAM3Python::reset)
+        .def("shutdown", &ORBSLAM3Python::shutdown)
+        .def("is_shutdown", &ORBSLAM3Python::isShutDown)
+        .def("is_running", &ORBSLAM3Python::isRunning)        
+        .def("viewer_should_quit", &ORBSLAM3Python::ViewerShouldQuit)
         .def("set_use_viewer", &ORBSLAM3Python::setUseViewer)
-        .def("get_trajectory", &ORBSLAM3Python::getTrajectory);
+        .def("get_trajectory", &ORBSLAM3Python::getTrajectory)
+        
+        // ---------------------------------------------------------------
+        // Custom Functions
+        // ---------------------------------------------------------------
+        .def("get_num_maps_in_atlas", &ORBSLAM3Python::GetNumMapsInAtlas)
+        .def("get_active_map_id", &ORBSLAM3Python::GetActiveMapID)
+        .def("get_all_keyframe_times", &ORBSLAM3Python::GetAllKeyFrameTimes, py::return_value_policy::copy)
+        .def("get_all_keyframe_map_ids", &ORBSLAM3Python::GetAllKeyFrameMapIDs, py::return_value_policy::copy)
+        .def("get_all_keyframe_poses", &ORBSLAM3Python::GetAllKeyFramePosesNP)
+        .def("process_image_rgbd_imu", &ORBSLAM3Python::processRGBD_IMU, py::arg("image"), py::arg("depth"), py::arg("time_stamp"), py::arg("vImuMeas"));
 }
