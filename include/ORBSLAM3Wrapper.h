@@ -33,6 +33,7 @@ public:
     std::vector<int> GetAllKeyFrameMapIDs();
     py::tuple GetAllKeyFrameData();
     py::array_t<float> GetActiveKeyFramePosesNP();
+    bool processRGBD_IMU(cv::Mat image, cv::Mat depthImage, double timestamp, py::array_t<float> vImuMeas);
 
 private:
     std::string vocabluaryFile;

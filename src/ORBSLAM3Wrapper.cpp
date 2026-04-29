@@ -190,6 +190,69 @@ py::tuple ORBSLAM3Python::GetAllKeyFrameData()
     return py::make_tuple(times, poses_np, mapIDs);
 }
 
+bool ORBSLAM3Python::processRGBD_IMU(cv::Mat image, cv::Mat depthImage, double timestamp, py::array_t<float> vImuMeas)
+{
+    if (!system)
+    {
+        std::cout << "you must call initialize() first!" << std::endl;
+        return false;
+    }
+    if (sensorMode != ORB_SLAM3::System::IMU_RGBD)
+    {
+        std::cout << "Error: you called processRGBD_IMU but the system was not initialized in IMU_RGBD mode." << std::endl;
+        return false;
+    }
+    if (!image.data || !depthImage.data)
+    {
+        std::cout << "Error: image or depth image is empty." << std::endl;
+        return false;
+    }
+    if (vImuMeas.ndim() != 2)
+    {
+        std::cout << "Error: vImuMeas should be a 2D array." << std::endl;
+        return false;
+    }
+    
+    auto values = vImuMeas.unchecked<2>();
+    pybind11::ssize_t N = values.shape(0);
+    pybind11::ssize_t w = values.shape(1);
+
+    std::vector<ORB_SLAM3::IMU::Point> vImuMeasurements;
+    vImuMeasurements.reserve(N);
+
+    if (w != 7)
+    {
+        std::cout << "IMU measurement should have 7 values [ax, ay, az, wx, wy, wz, t]" << std::endl;
+        return false;
+    }
+
+    for (pybind11::ssize_t i = 0; i < N; i++)
+    {
+        float ax = values(i, 0);
+        float ay = values(i, 1);
+        float az = values(i, 2);
+        float wx = values(i, 3);
+        float wy = values(i, 4);
+        float wz = values(i, 5);
+        double t = static_cast<double>(values(i, 6));
+        vImuMeasurements.emplace_back(ax, ay, az, wx, wy, wz, t);
+    }
+
+    // Print IMU measurements
+    // std::cout << "IMU Measurements (" << vImuMeasurements.size() << " total):" << std::endl;
+    // for (size_t i = 0; i < vImuMeasurements.size(); i++)
+    // {
+    //     const auto& imu = vImuMeasurements[i];
+    //     std::cout << "  [" << i << "] t=" << imu.t 
+    //               << " acc=(" << imu.a(0) << ", " << imu.a(1) << ", " << imu.a(2) << ")"
+    //               << " gyro=(" << imu.w(0) << ", " << imu.w(1) << ", " << imu.w(2) << ")"
+    //               << std::endl;
+    // }
+
+    system->TrackRGBD(image, depthImage, timestamp, vImuMeasurements);
+    return !system->isLost();
+}
+
 PYBIND11_MODULE(orbslam3, m)
 {
     NDArrayConverter::init_numpy();
@@ -232,5 +295,6 @@ PYBIND11_MODULE(orbslam3, m)
         .def("get_all_keyframe_times", &ORBSLAM3Python::GetAllKeyFrameTimes, py::return_value_policy::copy)
         .def("get_all_keyframe_map_ids", &ORBSLAM3Python::GetAllKeyFrameMapIDs, py::return_value_policy::copy)
         .def("get_all_keyframe_poses", &ORBSLAM3Python::GetAllKeyFramePosesNP)
-        .def("get_all_keyframe_data", &ORBSLAM3Python::GetAllKeyFrameData);
+        .def("get_all_keyframe_data", &ORBSLAM3Python::GetAllKeyFrameData)
+        .def("process_image_rgbd_imu", &ORBSLAM3Python::processRGBD_IMU, py::arg("image"), py::arg("depth"), py::arg("time_stamp"), py::arg("vImuMeas"));
 }
