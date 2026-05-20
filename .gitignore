@@ -1,6 +1,4 @@
 build/
 *.egg-info/
-outputs/
-examples/
-dist/
 __pycache__
+.vscode/
