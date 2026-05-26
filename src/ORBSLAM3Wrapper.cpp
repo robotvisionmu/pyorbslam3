@@ -123,11 +123,6 @@ void ORBSLAM3Python::setUseViewer(bool useViewer)
     bUseViewer = useViewer;
 }
 
-std::vector<Eigen::Matrix4f> ORBSLAM3Python::getTrajectory() const
-{
-    return system->GetCameraTrajectory();
-}
-
 bool ORBSLAM3Python::ViewerShouldQuit()
 {
     return system->ViewerShouldQuit();
@@ -188,6 +183,19 @@ py::tuple ORBSLAM3Python::GetAllKeyFrameData()
     }
 
     return py::make_tuple(times, poses_np, mapIDs);
+}
+
+py::array_t<float> ORBSLAM3Python::GetActiveFramePosesNP() const
+{
+    auto trajectory = system->GetActiveFramePoses();
+    py::ssize_t N = static_cast<py::ssize_t>(trajectory.size());
+    py::array_t<float> arr({N, (py::ssize_t)4, (py::ssize_t)4});
+    auto buf = arr.mutable_unchecked<3>();
+    for (py::ssize_t i = 0; i < N; ++i)
+    {
+        std::memcpy(buf.mutable_data(i, 0, 0), trajectory[i].data(), 16 * sizeof(float));
+    }
+    return arr;
 }
 
 bool ORBSLAM3Python::processRGBD_IMU(cv::Mat image, cv::Mat depthImage, double timestamp, py::array_t<float> vImuMeas)
@@ -285,7 +293,6 @@ PYBIND11_MODULE(orbslam3, m)
         .def("is_running", &ORBSLAM3Python::isRunning)        
         .def("viewer_should_quit", &ORBSLAM3Python::ViewerShouldQuit)
         .def("set_use_viewer", &ORBSLAM3Python::setUseViewer)
-        .def("get_trajectory", &ORBSLAM3Python::getTrajectory)
         
         // ---------------------------------------------------------------
         // Custom Functions
@@ -296,5 +303,6 @@ PYBIND11_MODULE(orbslam3, m)
         .def("get_all_keyframe_map_ids", &ORBSLAM3Python::GetAllKeyFrameMapIDs, py::return_value_policy::copy)
         .def("get_all_keyframe_poses", &ORBSLAM3Python::GetAllKeyFramePosesNP)
         .def("get_all_keyframe_data", &ORBSLAM3Python::GetAllKeyFrameData)
+        .def("get_active_frame_poses", &ORBSLAM3Python::GetActiveFramePosesNP)
         .def("process_image_rgbd_imu", &ORBSLAM3Python::processRGBD_IMU, py::arg("image"), py::arg("depth"), py::arg("time_stamp"), py::arg("vImuMeas"));
 }

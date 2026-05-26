@@ -23,7 +23,6 @@ public:
     bool isShutDown();
     bool isRunning();
     void setUseViewer(bool useViewer);
-    std::vector<Eigen::Matrix4f> getTrajectory() const;
     bool ViewerShouldQuit();
     int GetNumMapsInAtlas();
     int GetActiveMapID();
@@ -33,6 +32,7 @@ public:
     std::vector<int> GetAllKeyFrameMapIDs();
     py::tuple GetAllKeyFrameData();
     py::array_t<float> GetActiveKeyFramePosesNP();
+    py::array_t<float> GetActiveFramePosesNP();
     bool processRGBD_IMU(cv::Mat image, cv::Mat depthImage, double timestamp, py::array_t<float> vImuMeas);
 
 private:

@@ -119,8 +119,10 @@ def main():
             logger.exception('Failed to retrieve/write keyframe trajectory')
     else:
         try:
-            traj = slam.get_trajectory()
-            if traj:
+            logger.info('Retrieving full trajectory')
+            traj = slam.get_active_frame_poses()
+            logger.info(f'Full trajectory retrieved with {len(traj)} frames')
+            if len(traj) > 0:
                 write_full_trajectory(traj, out_path)
                 logger.info(f'Wrote full trajectory with {len(traj)} frames to {out_path}')
             else:
