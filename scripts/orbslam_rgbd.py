@@ -74,11 +74,39 @@ def main():
     logger.info('SLAM initialized')
 
     # Process frames
-    for i, (r, d) in enumerate(zip(rgb_frames, depth_frames)):
+    for i, (r, d) in enumerate(zip(rgb_frames[1000:], depth_frames[1000:])):
         rgb = cv2.imread(r)
         depth = cv2.imread(d, -1)
         timestamp = float(i)
         slam.process_image_rgbd(rgb, depth, timestamp)
+
+        # print(f'Keyframes: {slam.get_all_keyframe_times()} ')
+        # print(f'Keyframe Map IDs: {slam.get_all_keyframe_map_ids()} ')
+
+        # # Poll and print any map events produced by the C++ core
+        # try:
+        #     events = slam.get_map_events()
+        #     if events:
+        #         logger.info('Map events at frame %d: %s', i, events)
+        # except Exception:
+        #     logger.exception('Failed to poll map events')
+
+        # # Trigger a dataset change halfway through to exercise multi-session APIs
+        # if i == len(rgb_frames) // 2:
+        #     print(f'Keyframes: {slam.get_all_keyframe_times()} ')
+        #     print(f'Len KFs: {len(slam.get_all_keyframe_times())} ')
+        #     print(f'Keyframe Map IDs: {slam.get_all_keyframe_map_ids()} ')
+        #     logger.info('Calling change_dataset() at frame %d', i)
+        #     try:
+
+        #         slam.change_dataset()
+        #         # Optionally reset the active map after dataset change
+        #         slam.reset_active_map()
+        #     except Exception:
+        #         logger.exception('Change/reset dataset failed')
+
+        #     print(f'Keyframes: {slam.get_all_keyframe_times()} ')
+        #     print(f'Keyframe Map IDs: {slam.get_all_keyframe_map_ids()} ')
 
     # Wait for viewer to close if enabled
     if args.use_viewer:
@@ -92,6 +120,17 @@ def main():
     slam.shutdown()
     while not slam.is_shutdown():
         pass
+
+    # After shutdown, poll any remaining map events (and show that atlas was saved if configured)
+    try:
+        final_events = slam.get_map_events()
+        if final_events:
+            logger.info('Final map events after shutdown: %s', final_events)
+    except Exception:
+        logger.exception('Failed to retrieve final map events')
+
+    # print(f'Keyframes: {slam.get_all_keyframe_times()} ')
+    # print(f'Keyframe Map IDs: {slam.get_all_keyframe_map_ids()} ')
 
     # Save trajectory
     # If --output is provided, use it. Otherwise, default to dataset-based paths depending on keyframes-only flag
