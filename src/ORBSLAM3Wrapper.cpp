@@ -3,6 +3,8 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
+#include <array>
+#include <cstring>
 #include <KeyFrame.h>
 #include <Converter.h>
 #include <Tracking.h>
@@ -16,6 +18,32 @@
 #include "NDArrayConverter.h"
 
 namespace py = pybind11;
+
+namespace
+{
+py::array_t<float> Array16ToNumpy(const std::array<float,16>& data)
+{
+    py::array_t<float> arr({(py::ssize_t)4, (py::ssize_t)4});
+    auto buf = arr.mutable_unchecked<2>();
+    std::memcpy(buf.mutable_data(0, 0), data.data(), 16 * sizeof(float));
+    return arr;
+}
+
+const char* MapEventTypeToString(ORB_SLAM3::Atlas::MapEventType type)
+{
+    switch(type)
+    {
+        case ORB_SLAM3::Atlas::MapEventType::MapCreated:
+            return "map_created";
+        case ORB_SLAM3::Atlas::MapEventType::MapMerged:
+            return "map_merged";
+        case ORB_SLAM3::Atlas::MapEventType::MapRemoved:
+            return "map_removed";
+        default:
+            return "unknown";
+    }
+}
+}
 
 ORBSLAM3Python::ORBSLAM3Python(std::string vocabFile, std::string settingsFile, ORB_SLAM3::System::eSensor sensorMode): 
     vocabluaryFile(vocabFile),
@@ -138,6 +166,22 @@ int ORBSLAM3Python::GetActiveMapID()
     return system->GetActiveMapID();
 }
 
+void ORBSLAM3Python::ChangeDataset()
+{
+    if(system)
+    {
+        system->ChangeDataset();
+    }
+}
+
+void ORBSLAM3Python::ResetActiveMap()
+{
+    if(system)
+    {
+        system->ResetActiveMap();
+    }
+}
+
 std::vector<double> ORBSLAM3Python::GetAllKeyFrameTimes()
 {
     std::vector<double> vTimes = system->GetAllKeyFrameTimes();
@@ -196,6 +240,66 @@ py::array_t<float> ORBSLAM3Python::GetActiveFramePosesNP() const
         std::memcpy(buf.mutable_data(i, 0, 0), trajectory[i].data(), 16 * sizeof(float));
     }
     return arr;
+}
+
+py::list ORBSLAM3Python::GetMapEvents()
+{
+    py::list events;
+    if(!system)
+    {
+        return events;
+    }
+
+    std::vector<ORB_SLAM3::Atlas::MapEvent> nativeEvents = system->PopMapEvents();
+    for (const auto& event : nativeEvents)
+    {
+        py::dict item;
+        item["type"] = MapEventTypeToString(event.type);
+        item["from_map_id"] = event.fromMapId;
+        item["to_map_id"] = event.toMapId;
+        item["timestamp"] = event.timestamp;
+        item["moved_keyframe_ids"] = py::cast(event.movedKeyframeIds);
+        if(event.hasTransform)
+        {
+            item["transform"] = Array16ToNumpy(event.transform);
+        }
+        else
+        {
+            item["transform"] = py::none();
+        }
+        events.append(item);
+    }
+    return events;
+}
+
+py::list ORBSLAM3Python::PeekMapEvents()
+{
+    py::list events;
+    if(!system)
+    {
+        return events;
+    }
+
+    std::vector<ORB_SLAM3::Atlas::MapEvent> nativeEvents = system->PeekMapEvents();
+    for (const auto& event : nativeEvents)
+    {
+        py::dict item;
+        item["type"] = MapEventTypeToString(event.type);
+        item["from_map_id"] = event.fromMapId;
+        item["to_map_id"] = event.toMapId;
+        item["timestamp"] = event.timestamp;
+        item["moved_keyframe_ids"] = py::cast(event.movedKeyframeIds);
+        if(event.hasTransform)
+        {
+            item["transform"] = Array16ToNumpy(event.transform);
+        }
+        else
+        {
+            item["transform"] = py::none();
+        }
+        events.append(item);
+    }
+    return events;
 }
 
 bool ORBSLAM3Python::processRGBD_IMU(cv::Mat image, cv::Mat depthImage, double timestamp, py::array_t<float> vImuMeas)
@@ -299,10 +403,14 @@ PYBIND11_MODULE(orbslam3, m)
         // ---------------------------------------------------------------
         .def("get_num_maps_in_atlas", &ORBSLAM3Python::GetNumMapsInAtlas)
         .def("get_active_map_id", &ORBSLAM3Python::GetActiveMapID)
+        .def("change_dataset", &ORBSLAM3Python::ChangeDataset)
+        .def("reset_active_map", &ORBSLAM3Python::ResetActiveMap)
         .def("get_all_keyframe_times", &ORBSLAM3Python::GetAllKeyFrameTimes, py::return_value_policy::copy)
         .def("get_all_keyframe_map_ids", &ORBSLAM3Python::GetAllKeyFrameMapIDs, py::return_value_policy::copy)
         .def("get_all_keyframe_poses", &ORBSLAM3Python::GetAllKeyFramePosesNP)
         .def("get_all_keyframe_data", &ORBSLAM3Python::GetAllKeyFrameData)
         .def("get_active_frame_poses", &ORBSLAM3Python::GetActiveFramePosesNP)
+        .def("get_map_events", &ORBSLAM3Python::GetMapEvents)
+        .def("peek_map_events", &ORBSLAM3Python::PeekMapEvents)
         .def("process_image_rgbd_imu", &ORBSLAM3Python::processRGBD_IMU, py::arg("image"), py::arg("depth"), py::arg("time_stamp"), py::arg("vImuMeas"));
 }

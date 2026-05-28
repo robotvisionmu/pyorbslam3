@@ -26,13 +26,17 @@ public:
     bool ViewerShouldQuit();
     int GetNumMapsInAtlas();
     int GetActiveMapID();
+    void ChangeDataset();
+    void ResetActiveMap();
     std::vector<double> GetAllKeyFrameTimes();
     std::vector<std::array<float,16>> GetAllKeyFramePoses();
     py::array_t<float> GetAllKeyFramePosesNP();
     std::vector<int> GetAllKeyFrameMapIDs();
     py::tuple GetAllKeyFrameData();
     py::array_t<float> GetActiveKeyFramePosesNP();
-    py::array_t<float> GetActiveFramePosesNP();
+    py::array_t<float> GetActiveFramePosesNP() const;
+    py::list GetMapEvents();
+    py::list PeekMapEvents();
     bool processRGBD_IMU(cv::Mat image, cv::Mat depthImage, double timestamp, py::array_t<float> vImuMeas);
 
 private:
